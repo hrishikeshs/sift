@@ -37,6 +37,11 @@ CREATE TRIGGER IF NOT EXISTS entries_ad AFTER DELETE ON entries BEGIN
     INSERT INTO entries_fts(entries_fts, rowid, content) VALUES ('delete', old.id, old.content);
 END;
 
+CREATE TRIGGER IF NOT EXISTS entries_au AFTER UPDATE ON entries BEGIN
+    INSERT INTO entries_fts(entries_fts, rowid, content) VALUES ('delete', old.id, old.content);
+    INSERT INTO entries_fts(rowid, content) VALUES (new.id, new.content);
+END;
+
 CREATE TABLE IF NOT EXISTS index_state (
     source_file  TEXT PRIMARY KEY,
     byte_offset  INTEGER NOT NULL,

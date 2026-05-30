@@ -2,8 +2,10 @@ package cmd
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"os/signal"
+
 	"syscall"
 	"time"
 
@@ -35,7 +37,7 @@ var daemonCmd = &cobra.Command{
 
 		// Run immediately on start
 		if err := idx.IndexAll(); err != nil {
-			fmt.Fprintf(os.Stderr, "Index error: %v\n", err)
+			log.Printf("Index error: %v", err)
 		}
 
 		ticker := time.NewTicker(interval)
@@ -48,7 +50,7 @@ var daemonCmd = &cobra.Command{
 			select {
 			case <-ticker.C:
 				if err := idx.IndexAll(); err != nil {
-					fmt.Fprintf(os.Stderr, "Index error: %v\n", err)
+					log.Printf("Index error: %v", err)
 				}
 			case <-sig:
 				fmt.Fprintf(os.Stderr, "\nsift daemon stopped\n")

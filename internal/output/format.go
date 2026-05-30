@@ -84,10 +84,7 @@ func PrintContext(entries []db.SearchResult, targetID int64) {
 				projectName(r.ProjectPath, r.ProjectHash))
 		}
 
-		content := r.Content
-		if len(content) > 500 {
-			content = content[:500] + "..."
-		}
+		content := truncateRunes(r.Content, 500)
 		fmt.Printf("  %s\n\n", content)
 	}
 }
@@ -145,6 +142,14 @@ func projectName(path, hash string) string {
 		return parts[len(parts)-1]
 	}
 	return hash
+}
+
+func truncateRunes(s string, max int) string {
+	runes := []rune(s)
+	if len(runes) > max {
+		return string(runes[:max]) + "..."
+	}
+	return s
 }
 
 func abbreviatePath(path string) string {

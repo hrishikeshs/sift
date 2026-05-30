@@ -35,7 +35,6 @@ type Stats struct {
 	TotalEntries  int
 	ProjectCounts map[string]int
 	TypeCounts    map[string]int
-	DBSizeBytes   int64
 	ChunkCount    int
 }
 
@@ -150,9 +149,9 @@ func (db *DB) GetContext(entry *SearchResult, before, after int) ([]SearchResult
 		SELECT id, content, source_type, timestamp, project_path, project_hash,
 			session_id, message_id, model, source_file
 		FROM entries
-		WHERE source_file = ? AND timestamp <= ? AND id < ?
+		WHERE source_file = ? AND id < ?
 		ORDER BY id DESC LIMIT ?`,
-		entry.SourceFile, entry.Timestamp, entry.ID, before)
+		entry.SourceFile, entry.ID, before)
 	if err != nil {
 		return nil, err
 	}
@@ -162,7 +161,9 @@ func (db *DB) GetContext(entry *SearchResult, before, after int) ([]SearchResult
 	for rows.Next() {
 		var r SearchResult
 		var pp, ph, sid, mid, m sql.NullString
-		rows.Scan(&r.ID, &r.Content, &r.SourceType, &r.Timestamp, &pp, &ph, &sid, &mid, &m, &r.SourceFile)
+		if err := rows.Scan(&r.ID, &r.Content, &r.SourceType, &r.Timestamp, &pp, &ph, &sid, &mid, &m, &r.SourceFile); err != nil {
+			continue
+		}
 		r.ProjectPath = pp.String
 		r.ProjectHash = ph.String
 		r.SessionID = sid.String
@@ -193,7 +194,9 @@ func (db *DB) GetContext(entry *SearchResult, before, after int) ([]SearchResult
 	for rows2.Next() {
 		var r SearchResult
 		var pp, ph, sid, mid, m sql.NullString
-		rows2.Scan(&r.ID, &r.Content, &r.SourceType, &r.Timestamp, &pp, &ph, &sid, &mid, &m, &r.SourceFile)
+		if err := rows2.Scan(&r.ID, &r.Content, &r.SourceType, &r.Timestamp, &pp, &ph, &sid, &mid, &m, &r.SourceFile); err != nil {
+			continue
+		}
 		r.ProjectPath = pp.String
 		r.ProjectHash = ph.String
 		r.SessionID = sid.String
@@ -259,37 +262,38 @@ func (db *DB) OrphanedFiles() ([]string, int, error) {
 	total := 0
 	for rows.Next() {
 		var f string
-		rows.Scan(&f)
+		if err := rows.Scan(&f); err != nil {
+			continue
+		}
 		total++
-	}
-
-	rows2, err := db.conn.Query(`SELECT DISTINCT source_file FROM entries`)
-	if err != nil {
-		return nil, 0, err
-	}
-	defer rows2.Close()
-
-	for rows2.Next() {
-		var f string
-		rows2.Scan(&f)
 		if !fileExists(f) {
 			orphaned = append(orphaned, f)
 		}
 	}
 
-	return orphaned, total, nil
+	return orphaned, total, rows.Err()
 }
 
 func (db *DB) DeleteOrphaned(files []string) (int, error) {
+	tx, err := db.conn.Begin()
+	if err != nil {
+		return 0, err
+	}
+	defer tx.Rollback()
+
 	total := 0
 	for _, f := range files {
-		res, err := db.conn.Exec(`DELETE FROM entries WHERE source_file = ?`, f)
+		res, err := tx.Exec(`DELETE FROM entries WHERE source_file = ?`, f)
 		if err != nil {
 			return total, err
 		}
 		n, _ := res.RowsAffected()
 		total += int(n)
-		db.conn.Exec(`DELETE FROM index_state WHERE source_file = ?`, f)
+		tx.Exec(`DELETE FROM index_state WHERE source_file = ?`, f)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return total, err
 	}
 	db.conn.Exec(`VACUUM`)
 	return total, nil

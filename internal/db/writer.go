@@ -110,6 +110,11 @@ func (db *DB) DeleteEntriesForFile(sourceFile string) error {
 	return err
 }
 
+func (db *DB) DeleteChunksForFile(sourceFile string) error {
+	_, err := db.conn.Exec(`DELETE FROM chunks WHERE source_file = ?`, sourceFile)
+	return err
+}
+
 func (db *DB) DeleteIndexState(sourceFile string) error {
 	_, err := db.conn.Exec(`DELETE FROM index_state WHERE source_file = ?`, sourceFile)
 	return err

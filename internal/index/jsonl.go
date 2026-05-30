@@ -8,7 +8,6 @@ import (
 	"io"
 	"os"
 	"sort"
-	"strings"
 	"time"
 
 	"github.com/hrishikeshs/sift/internal/db"
@@ -35,14 +34,14 @@ func (idx *Indexer) IndexFile(f project.JSONLFile) (int, error) {
 	// Check for file rotation
 	if state != nil {
 		if fileSize < state.ByteOffset {
-			// File is smaller than last offset — rotated
 			idx.DB.DeleteEntriesForFile(f.Path)
 			idx.DB.DeleteIndexState(f.Path)
+			idx.DB.DeleteChunksForFile(f.Path)
 			state = nil
 		} else if state.FileHash != "" && !hashMatches(f.Path, state.FileHash) {
-			// First 4KB hash differs — different file at same path
 			idx.DB.DeleteEntriesForFile(f.Path)
 			idx.DB.DeleteIndexState(f.Path)
+			idx.DB.DeleteChunksForFile(f.Path)
 			state = nil
 		}
 	}
@@ -106,7 +105,9 @@ func (idx *Indexer) IndexFile(f project.JSONLFile) (int, error) {
 	}
 
 	if err := scanner.Err(); err != nil {
-		return totalNew, fmt.Errorf("scanning file: %w", err)
+		// Oversized lines cause ErrTooLong — advance past them to avoid stalling
+		fmt.Fprintf(os.Stderr, "Warning: skipped oversized line in %s at offset %d: %v\n", f.Path, currentOffset, err)
+		currentOffset = fileSize
 	}
 
 	// Flush remaining batch
@@ -213,12 +214,3 @@ func hashMatches(path, expectedHash string) bool {
 	return actual == expectedHash
 }
 
-// reverseHash is used to look up project paths. Duplicated from project package
-// to avoid circular imports — the indexer needs it for display only.
-func shortProject(hash string) string {
-	parts := strings.Split(hash, "-")
-	if len(parts) > 1 {
-		return parts[len(parts)-1]
-	}
-	return hash
-}
