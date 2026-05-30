@@ -74,7 +74,9 @@ func (db *DB) Search(params SearchParams) ([]SearchResult, int, error) {
 		JOIN entries e ON entries_fts.rowid = e.id
 		WHERE %s`, whereClause)
 	var total int
-	db.conn.QueryRow(countQuery, args...).Scan(&total)
+	if err := db.conn.QueryRow(countQuery, args...).Scan(&total); err != nil {
+		total = 0
+	}
 
 	args = append(args, params.Limit)
 
@@ -220,7 +222,9 @@ func (db *DB) GetStats() (*Stats, error) {
 		TypeCounts:    make(map[string]int),
 	}
 
-	db.conn.QueryRow(`SELECT COUNT(*) FROM entries`).Scan(&stats.TotalEntries)
+	if err := db.conn.QueryRow(`SELECT COUNT(*) FROM entries`).Scan(&stats.TotalEntries); err != nil {
+		return nil, err
+	}
 
 	rows, err := db.conn.Query(`SELECT COALESCE(project_hash, 'unknown'), COUNT(*) FROM entries GROUP BY project_hash`)
 	if err != nil {
@@ -230,7 +234,9 @@ func (db *DB) GetStats() (*Stats, error) {
 	for rows.Next() {
 		var name string
 		var count int
-		rows.Scan(&name, &count)
+		if err := rows.Scan(&name, &count); err != nil {
+			continue
+		}
 		stats.ProjectCounts[name] = count
 	}
 
@@ -242,11 +248,15 @@ func (db *DB) GetStats() (*Stats, error) {
 	for rows2.Next() {
 		var name string
 		var count int
-		rows2.Scan(&name, &count)
+		if err := rows2.Scan(&name, &count); err != nil {
+			continue
+		}
 		stats.TypeCounts[name] = count
 	}
 
-	db.conn.QueryRow(`SELECT COUNT(*) FROM chunks`).Scan(&stats.ChunkCount)
+	if err := db.conn.QueryRow(`SELECT COUNT(*) FROM chunks`).Scan(&stats.ChunkCount); err != nil {
+		return nil, err
+	}
 
 	return stats, nil
 }

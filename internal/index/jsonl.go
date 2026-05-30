@@ -105,9 +105,14 @@ func (idx *Indexer) IndexFile(f project.JSONLFile) (int, error) {
 	}
 
 	if err := scanner.Err(); err != nil {
-		// Oversized lines cause ErrTooLong — advance past them to avoid stalling
-		fmt.Fprintf(os.Stderr, "Warning: skipped oversized line in %s at offset %d: %v\n", f.Path, currentOffset, err)
-		currentOffset = fileSize
+		// Oversized lines cause ErrTooLong — seek past just the bad line
+		fmt.Fprintf(os.Stderr, "Warning: oversized line in %s at offset %d: %v\n", f.Path, currentOffset, err)
+		skipOffset := skipPastLine(file, currentOffset)
+		if skipOffset > currentOffset {
+			currentOffset = skipOffset
+		} else {
+			currentOffset = fileSize
+		}
 	}
 
 	// Flush remaining batch
@@ -166,6 +171,26 @@ func archiveWorthy(line []byte) bool {
 		return json.Unmarshal(entry.Message.Content, &s) == nil
 	default:
 		return false
+	}
+}
+
+func skipPastLine(file *os.File, offset int64) int64 {
+	if _, err := file.Seek(offset, io.SeekStart); err != nil {
+		return offset
+	}
+	buf := make([]byte, 64*1024)
+	pos := offset
+	for {
+		n, err := file.Read(buf)
+		for i := 0; i < n; i++ {
+			if buf[i] == '\n' {
+				return pos + int64(i) + 1
+			}
+		}
+		pos += int64(n)
+		if err != nil {
+			return pos
+		}
 	}
 }
 
