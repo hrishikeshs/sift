@@ -325,7 +325,7 @@ func autoPhrase(query string) string {
 			return query
 		}
 	}
-	if strings.Contains(query, " ") {
+	if strings.ContainsAny(query, " -") {
 		return `"` + query + `"`
 	}
 	return query
