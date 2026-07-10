@@ -69,7 +69,7 @@ var searchCmd = &cobra.Command{
 
 func init() {
 	searchCmd.Flags().StringVar(&searchSince, "since", "", "filter by time (2w, 3d, yesterday, 2026-04-20)")
-	searchCmd.Flags().StringVar(&searchType, "type", "", "filter by source type (thinking, text, user, tool_use)")
+	searchCmd.Flags().StringVar(&searchType, "type", "", "filter by source type (thinking, reasoning_summary, text, user, tool_use)")
 	searchCmd.Flags().StringVar(&searchProject, "project", "", "filter by project path or hash")
 	searchCmd.Flags().StringVar(&searchSession, "session", "", "filter by session ID")
 	searchCmd.Flags().IntVar(&searchLimit, "limit", 20, "max results to return")

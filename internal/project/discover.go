@@ -13,11 +13,19 @@ type Project struct {
 	SessionDir string
 }
 
+type Provider string
+
+const (
+	ProviderClaude Provider = "claude"
+	ProviderCodex  Provider = "codex"
+)
+
 type JSONLFile struct {
 	Path        string
 	SessionID   string
 	ProjectHash string
 	ProjectPath string
+	Provider    Provider
 }
 
 func Discover() ([]Project, error) {

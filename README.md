@@ -1,12 +1,12 @@
 # Sift
 
-Full-text search for Claude Code sessions.
+Full-text search for Claude Code and Codex sessions.
 
-Index your JSONL session transcripts into a local SQLite database and search across every conversation you've ever had — thinking traces, responses, user messages — in milliseconds.
+Index your local JSONL session transcripts into a SQLite database and search across agent responses, user messages, Claude thinking traces, and Codex reasoning summaries in milliseconds.
 
 ## Why Sift?
 
-Claude Code writes rich JSONL session transcripts that accumulate over weeks and months. These files:
+Claude Code and Codex write rich JSONL session transcripts that accumulate over weeks and months. These files:
 
 - **Grow large** — a single session can reach hundreds of MB
 - **Scatter** across `~/.claude/projects/` in UUID-named files
@@ -33,6 +33,12 @@ go build -o sift .
 ```sh
 # Index all your Claude Code sessions
 sift index --all
+
+# Or opt in to Codex rollouts (Claude remains the default)
+sift index --all --provider codex
+
+# Index both providers
+sift index --all --provider all
 
 # Search for anything
 sift search "heatmap rendering"
@@ -116,6 +122,10 @@ The target entry is highlighted with `◀` so you can spot it in the conversatio
 # Index everything
 sift index --all
 
+# Select a provider (claude is the backwards-compatible default)
+sift index --all --provider codex
+sift index --all --provider all
+
 # Index a specific project
 sift index --project ~/workspace/myapp
 
@@ -142,12 +152,14 @@ On macOS, `sift install` creates a LaunchAgent. On Linux, a systemd user service
 
 | Content | Indexed? | Type |
 |---------|----------|------|
-| Agent thinking traces | Yes | `thinking` |
+| Claude thinking traces | Yes | `thinking` |
+| Codex reasoning summaries | Yes | `reasoning_summary` |
+| Codex encrypted/raw reasoning | No | — |
 | Agent text responses | Yes | `text` |
 | Your messages | Yes | `user` |
 | Tool names (Read, Edit, etc.) | Yes | `tool_use` |
 | Tool results (file contents, CLI output) | No | — |
-| Progress/hook events | No | — |
+| Progress/hook/event messages | No | — |
 | File history snapshots | No | — |
 
 ### Incremental & Efficient
@@ -159,7 +171,7 @@ On macOS, `sift install` creates a LaunchAgent. On Linux, a systemd user service
 
 ### Daily Archives
 
-JSONL files get rotated by Claude Code. Sift archives raw session data into daily gzipped chunks in the database, so your conversations survive file deletion. Only user messages and agent responses are archived — tool results are excluded to keep the database lean.
+JSONL files can be rotated by the provider. Sift archives message records into daily gzipped chunks in the database, so your conversations survive file deletion. Tool results and Codex reasoning records (including encrypted reasoning) are excluded from archives.
 
 ## Housekeeping
 
@@ -175,7 +187,7 @@ sift gc              # execute
 ## How It Works
 
 ```
-~/.claude/projects/                        ~/.sift/sift.db
+~/.claude/projects/ or ~/.codex/sessions/  ~/.sift/sift.db
 ├── -Users-...-myapp/                      ┌─────────────────────┐
 │   ├── abc123.jsonl  ──── index ────────▶ │ entries (FTS5)      │
 │   └── def456.jsonl  ──── index ────────▶ │ entries_fts         │
@@ -190,8 +202,8 @@ sift gc              # execute
                                            highlighted snippets
 ```
 
-1. **Discover** — scans `~/.claude/projects/` for all JSONL files
-2. **Parse** — extracts thinking, text, and user content from each JSONL line
+1. **Discover** — scans `~/.claude/projects/` by default, or Codex's `sessions/` and `archived_sessions/` beneath `${CODEX_HOME:-~/.codex}` when selected
+2. **Parse** — extracts provider-specific user and agent content; only explicit Codex reasoning summaries are indexed
 3. **Index** — inserts into SQLite with FTS5 full-text search (porter stemming)
 4. **Archive** — compresses raw JSONL lines into daily gzip chunks
 5. **Search** — FTS5 ranked query with snippet highlighting
@@ -215,7 +227,7 @@ sift/
 │   ├── db/               # SQLite + FTS5 storage
 │   ├── index/            # JSONL scanner + archival
 │   ├── parse/            # Entry parsing + time duration
-│   ├── project/          # Project discovery
+│   ├── project/          # Claude and Codex discovery
 │   └── output/           # Terminal formatting
 ├── go.mod
 └── go.sum
@@ -227,6 +239,12 @@ sift/
 - [modernc.org/sqlite](https://pkg.go.dev/modernc.org/sqlite) — pure Go SQLite (no CGO)
 
 Zero runtime dependencies. Single binary.
+
+## Provider compatibility
+
+Existing commands keep their original Claude behavior: omitting `--provider` is equivalent to `--provider claude`. Codex support is additive and does not change the database schema.
+
+Codex rollout JSONL is a local implementation format and may evolve between CLI releases. Sift intentionally parses only a narrow set of records: `session_meta` for discovery and `response_item` messages/reasoning summaries for indexing. It never decodes or indexes `encrypted_content`, and ignores duplicate `event_msg` records.
 
 ## Database
 

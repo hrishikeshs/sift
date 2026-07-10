@@ -14,7 +14,10 @@ import (
 	"github.com/hrishikeshs/sift/internal/index"
 )
 
-var daemonInterval string
+var (
+	daemonInterval string
+	daemonProvider string
+)
 
 var daemonCmd = &cobra.Command{
 	Use:   "daemon",
@@ -36,7 +39,7 @@ var daemonCmd = &cobra.Command{
 		fmt.Fprintf(os.Stderr, "sift daemon started (interval: %s)\n", interval)
 
 		// Run immediately on start
-		if err := idx.IndexAll(); err != nil {
+		if err := idx.IndexAllProvider(daemonProvider); err != nil {
 			log.Printf("Index error: %v", err)
 		}
 
@@ -49,7 +52,7 @@ var daemonCmd = &cobra.Command{
 		for {
 			select {
 			case <-ticker.C:
-				if err := idx.IndexAll(); err != nil {
+				if err := idx.IndexAllProvider(daemonProvider); err != nil {
 					log.Printf("Index error: %v", err)
 				}
 			case <-sig:
@@ -62,5 +65,6 @@ var daemonCmd = &cobra.Command{
 
 func init() {
 	daemonCmd.Flags().StringVar(&daemonInterval, "interval", "60m", "indexing interval (e.g. 30m, 1h)")
+	daemonCmd.Flags().StringVar(&daemonProvider, "provider", "claude", "transcript provider: claude, codex, or all")
 	rootCmd.AddCommand(daemonCmd)
 }
