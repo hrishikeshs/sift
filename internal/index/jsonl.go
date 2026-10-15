@@ -81,14 +81,19 @@ func (idx *Indexer) IndexFile(f project.JSONLFile) (int, error) {
 		lineStr := string(line)
 		lineLen := int64(len(line)) + 1 // +1 for newline
 
-		entries := parse.ExtractEntries(line, f.Path, f.ProjectPath, f.ProjectHash, currentOffset)
+		var entries []db.Entry
+		if f.Provider == project.ProviderCodex {
+			entries = parse.ExtractCodexEntries(line, f.Path, f.ProjectPath, f.ProjectHash, f.SessionID, currentOffset)
+		} else {
+			entries = parse.ExtractEntries(line, f.Path, f.ProjectPath, f.ProjectHash, currentOffset)
+		}
 		batch = append(batch, entries...)
 		totalNew += len(entries)
 
 		// Archive only user + assistant lines (skip tool_result, progress, etc.)
-		if archiveWorthy(line) {
+		if archiveWorthyForProvider(line, f.Provider) {
 			ts := extractTimestamp(line)
-			if ts != "" {
+			if len(ts) >= 10 {
 				date := ts[:10] // YYYY-MM-DD
 				chunkLines[date] = append(chunkLines[date], lineStr)
 			}
@@ -150,6 +155,13 @@ func (idx *Indexer) IndexFile(f project.JSONLFile) (int, error) {
 	}
 
 	return totalNew, nil
+}
+
+func archiveWorthyForProvider(line []byte, provider project.Provider) bool {
+	if provider == project.ProviderCodex {
+		return parse.CodexArchiveWorthy(line)
+	}
+	return archiveWorthy(line)
 }
 
 func archiveWorthy(line []byte) bool {
@@ -238,4 +250,3 @@ func hashMatches(path, expectedHash string) bool {
 	actual := computeFileHash(path)
 	return actual == expectedHash
 }
-

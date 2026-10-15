@@ -13,8 +13,8 @@ var dbPath string
 
 var rootCmd = &cobra.Command{
 	Use:   "sift",
-	Short: "Full-text search for Claude Code sessions",
-	Long:  `sift indexes and searches Claude Code JSONL session transcripts.`,
+	Short: "Full-text search for agent coding sessions",
+	Long:  `sift indexes and searches Claude Code and Codex JSONL session transcripts.`,
 }
 
 func Execute() {

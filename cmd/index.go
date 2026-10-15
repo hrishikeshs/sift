@@ -9,9 +9,10 @@ import (
 )
 
 var (
-	indexAll     bool
-	indexProject string
-	indexVerbose bool
+	indexAll      bool
+	indexProject  string
+	indexVerbose  bool
+	indexProvider string
 )
 
 var indexCmd = &cobra.Command{
@@ -27,10 +28,10 @@ var indexCmd = &cobra.Command{
 		idx := &index.Indexer{DB: d, Verbose: indexVerbose}
 
 		if indexProject != "" {
-			return idx.IndexProject(indexProject)
+			return idx.IndexProjectProvider(indexProject, indexProvider)
 		}
 		if indexAll {
-			return idx.IndexAll()
+			return idx.IndexAllProvider(indexProvider)
 		}
 
 		fmt.Println("Specify --all to index all projects, or --project PATH for a specific project")
@@ -42,5 +43,6 @@ func init() {
 	indexCmd.Flags().BoolVar(&indexAll, "all", false, "index all discovered projects")
 	indexCmd.Flags().StringVar(&indexProject, "project", "", "index a specific project by path")
 	indexCmd.Flags().BoolVar(&indexVerbose, "verbose", false, "print progress details")
+	indexCmd.Flags().StringVar(&indexProvider, "provider", "claude", "transcript provider: claude, codex, or all")
 	rootCmd.AddCommand(indexCmd)
 }
